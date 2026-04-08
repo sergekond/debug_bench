@@ -11,14 +11,14 @@ int PIN[15] = {
   18,   // PIN4
   19,   // PIN5
   13,   // PIN6
-  -1,   // PIN7 = GND
+  32,   // PIN7 = GND
   14,   // PIN8
   21,   // PIN9
   22,   // PIN10
   15,   // PIN11
   23,   // PIN12
   25,    // PIN13
-  -1// PIN14 = VCC
+  33// PIN14 = VCC
 };
 
 struct Gate {
@@ -112,6 +112,11 @@ void setup() {
     if (PIN[i] != -1)
       pinMode(PIN[i], INPUT);
   }
+  pinMode(PIN[7], OUTPUT);
+  pinMode(PIN[14], OUTPUT);
+
+  digitalWrite(PIN[7], 0);
+  digitalWrite(PIN[14], 1);
 
   Serial.println("=== Универсальный тестер DIP-14 (74HCxx) ===");
 }
