@@ -20,18 +20,18 @@
 
 PIN1  -> GPIO16  
 PIN2  -> GPIO17  
-PIN3  -> GPIO34  
+PIN3  -> GPIO12  
 PIN4  -> GPIO18  
 PIN5  -> GPIO19  
-PIN6  -> GPIO35  
-PIN7  -> GND  
-PIN8  -> GPIO33  
+PIN6  -> GPIO13  
+PIN7  -> GPTO32 (LOW - GND)  
+PIN8  -> GPIO14  
 PIN9  -> GPIO21  
 PIN10 -> GPIO22  
-PIN11 -> GPIO32  
+PIN11 -> GPIO15  
 PIN12 -> GPIO23  
 PIN13 -> GPIO25  
-PIN14 -> VCC  
+PIN14 -> GPIO33 (HIGH - VCC)  
 
 ------------------------------------------------------------
 
