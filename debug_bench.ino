@@ -12,6 +12,26 @@ int PIN[15] = {
   -1
 };
 
+int PIN16[17] = {
+  -1,
+  16, // 1 /CLR1
+  17, // 2 J1
+  12, // 3 /K1
+  18, // 4 CLK1
+  19, // 5 /PRE1
+  13, // 6 Q1
+  26, // 7 /Q1
+  -1, // 8 GND
+  27, // 9 /Q2
+  14, // 10 Q2
+  21, // 11 /PRE2
+  22, // 12 CLK2
+  15, // 13 /K2
+  23, // 14 J2
+  25, // 15 /CLR2
+  -1  // 16 VCC
+};
+
 struct Gate {
   int A_pin;  
   int B_pin;
@@ -100,7 +120,7 @@ bool test_chip(const char* name, Gate gates[], bool (*logic)(int,int)) {
 
 // ---------- ТЕСТ 74HC74 ----------
 
-bool test_flipflop(int clr, int d, int clk, int pre, int q, int nq, int id) {
+bool test_d_flipflop(int clr, int d, int clk, int pre, int q, int nq, int id) {
 
   Serial.printf("\nТриггер %d\n", id);
 
@@ -187,7 +207,7 @@ bool test_flipflop(int clr, int d, int clk, int pre, int q, int nq, int id) {
     ok = false;
   }
 
-  if (ok) Serial.println("✔️ OK");
+  if (ok) Serial.println("OK");
 
   return ok;
 }
@@ -196,12 +216,151 @@ bool test_74HC74() {
 
   Serial.println("\n=== Тест 74HC74 ===");
 
-  bool ok1 = test_flipflop(1, 2, 3, 4, 5, 6, 1);
-  bool ok2 = test_flipflop(13, 12, 11, 10, 9, 8, 2);
+  bool ok1 = test_d_flipflop(1, 2, 3, 4, 5, 6, 1);
+  bool ok2 = test_d_flipflop(13, 12, 11, 10, 9, 8, 2);
 
   return ok1 && ok2;
 }
 
+// ---------- helper: safe clock pulse ----------
+void clkPulse(int clkPin) {
+  digitalWrite(clkPin, LOW);
+  delay(2);
+  digitalWrite(clkPin, HIGH);
+  delay(2);
+  digitalWrite(clkPin, LOW);
+}
+
+// ---------- stable init ----------
+void init109(int clr, int pre) {
+  digitalWrite(clr, LOW);
+  digitalWrite(pre, HIGH);
+  delay(5);
+  digitalWrite(clr, HIGH);
+  delay(5);
+  digitalWrite(pre, HIGH);
+  delay(5);
+}
+
+bool test_jk_flipflop(int clr, int j, int k, int clk, int pre, int q, int nq, int id) {
+
+  Serial.printf("\n=== Тест 74HC109 %d ===", id);
+
+  int pCLR = PIN16[clr];
+  int pJ   = PIN16[j];
+  int pK   = PIN16[k];   
+  int pCLK = PIN16[clk];
+  int pPRE = PIN16[pre];
+  int pQ   = PIN16[q];
+  int pNQ  = PIN16[nq];
+
+  pinMode(pCLR, OUTPUT);
+  pinMode(pPRE, OUTPUT);
+  pinMode(pJ, OUTPUT);
+  pinMode(pK, OUTPUT);
+  pinMode(pCLK, OUTPUT);
+
+  pinMode(pQ, INPUT);
+  pinMode(pNQ, INPUT);
+
+  bool ok = true;
+
+  // safe idle
+  digitalWrite(pPRE, HIGH);
+  digitalWrite(pCLR, HIGH);
+
+  // =========================
+  // RESET (CLR active LOW)
+  // =========================
+  digitalWrite(pCLR, LOW);
+  delay(5);
+  digitalWrite(pCLR, HIGH);
+  delay(5);
+
+  if (digitalRead(pQ) != 0 || digitalRead(pNQ) != 1) {
+    Serial.println("RESET FAIL");
+    ok = false;
+  }
+
+  // =========================
+  // SET (PRE active LOW)
+  // =========================
+  digitalWrite(pPRE, LOW);
+  delay(5);
+  digitalWrite(pPRE, HIGH);
+  delay(5);
+
+  if (digitalRead(pQ) != 1 || digitalRead(pNQ) != 0) {
+    Serial.println("SET FAIL");
+    ok = false;
+  }
+
+  // =========================
+  // J=1 K=0 (/K inactive = HIGH)
+  // =========================
+  digitalWrite(pJ, HIGH);
+  digitalWrite(pK, HIGH); // /K = 1 (inactive)
+
+  clkPulse(pCLK);
+
+  if (digitalRead(pQ) != 1) {
+    Serial.println("J=1 /K=0 FAIL");
+    ok = false;
+  }
+
+  // =========================
+  // J=0 K=1 (/K active LOW)
+  // =========================
+  digitalWrite(pJ, LOW);
+  digitalWrite(pK, LOW); // /K = 0 → active
+
+  clkPulse(pCLK);
+
+  if (digitalRead(pQ) != 0) {
+    Serial.println("J=0 /K=1 FAIL");
+    ok = false;
+  }
+
+  // =========================
+  // TOGGLE (J=1 K=1 → /K=1)
+  // =========================
+  digitalWrite(pJ, HIGH);
+  digitalWrite(pK, HIGH);
+
+  int before = digitalRead(pQ);
+
+  clkPulse(pCLK);
+
+  int after = digitalRead(pQ);
+
+  if (before == after) {
+    Serial.println("TOGGLE FAIL");
+    ok = false;
+  }
+
+  // =========================
+  // CHECK /Q
+  // =========================
+  if (digitalRead(pQ) == digitalRead(pNQ)) {
+    Serial.println("Q != /Q FAIL");
+    ok = false;
+  }
+
+  if (ok) Serial.println("OK");
+
+  return ok;
+}
+
+
+bool test_SN74HC109() {
+
+  Serial.println("\n=== Тест SN74HC109 (JK) ===");
+
+  bool ok1 = test_jk_flipflop(1, 2, 3, 4, 5, 6, 7, 1);
+  bool ok2 = test_jk_flipflop(15, 14, 13, 12, 11, 10, 9, 2);
+
+  return ok1 && ok2;
+}
 
 String cmd = "";
 
@@ -226,6 +385,9 @@ void handleCommand(String command) {
   else if (command == "HC74") {
     result = test_74HC74();
   }
+  else if (command == "HC109") {
+    result = test_SN74HC109();
+  }
   else {
     Serial.println("Неизвестная команда");
     return;
@@ -247,7 +409,7 @@ void setup() {
   pinMode(LED_PIN, OUTPUT);
 
   Serial.println("=== TESTER ===");
-  Serial.println("HC00 HC08 HC32 HC02 HC74");
+  Serial.println("HC00 HC08 HC32 HC02 HC74 HC109");
 }
 
 // ---------- LOOP ----------
