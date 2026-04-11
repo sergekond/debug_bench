@@ -2,23 +2,15 @@
 // Универсальный тестер 74HCxx (DIP-14) на ESP32
 // ==========================
 
+#define LED_PIN 2  // D2
+
 // Жёсткая привязка PINx → GPIO
 int PIN[15] = {
-  -1,   // 0 - не используется
-  16,   // PIN1
-  17,   // PIN2
-  12,   // PIN3
-  18,   // PIN4
-  19,   // PIN5
-  13,   // PIN6
-  -1,   // PIN7 = GND
-  14,   // PIN8
-  21,   // PIN9
-  22,   // PIN10
-  15,   // PIN11
-  23,   // PIN12
-  25,    // PIN13
-  -1// PIN14 = VCC
+  -1,
+  16, 17, 12, 18, 19, 13,
+  -1,
+  14, 21, 22, 15, 23, 25,
+  -1
 };
 
 struct Gate {
@@ -27,16 +19,15 @@ struct Gate {
   int Y_pin;
 };
 
-// ---------- Логические функции ----------
+// ---------- Логика ----------
 
 bool fNAND(int a, int b) { return !(a & b); }
 bool fAND (int a, int b) { return  (a & b); }
 bool fOR  (int a, int b) { return  (a | b); }
 bool fNOR (int a, int b) { return !(a | b); }
 
-// ---------- Топологии микросхем ----------
+// ---------- Топологии ----------
 
-// 74HC00 
 Gate HC00[4] = {
   {1, 2, 3},
   {4, 5, 6},
@@ -44,8 +35,6 @@ Gate HC00[4] = {
   {12, 13, 11}
 };
 
-
-// 74HC02 — NOR (другая топология)
 Gate HC02[4] = {
   {2, 3, 1},
   {5, 6, 4},
@@ -53,11 +42,24 @@ Gate HC02[4] = {
   {11, 12, 13}
 };
 
-// ---------- Универсальный тест ----------
+// ---------- Мигание ----------
 
-void test_chip(const char* name, Gate gates[], bool (*logic)(int,int)) {
+void blinkLED(int times) {
+  for (int i = 0; i < times; i++) {
+    digitalWrite(LED_PIN, HIGH);
+    delay(500);
+    digitalWrite(LED_PIN, LOW);
+    delay(500);
+  }
+}
+
+// ---------- Тест ----------
+
+bool test_chip(const char* name, Gate gates[], bool (*logic)(int,int)) {
 
   Serial.printf("\n=== Тест %s ===\n", name);
+
+  bool all_ok = true;
 
   for (int g = 0; g < 4; g++) {
 
@@ -88,19 +90,66 @@ void test_chip(const char* name, Gate gates[], bool (*logic)(int,int)) {
         int y = digitalRead(pinY);
         int y_exp = logic(a, b);
 
-        Serial.printf("A=%d B=%d -> Y=%d (ожидалось %d) %s\n",
-                      a, b, y, y_exp,
-                      (y == y_exp ? "OK" : "FAIL"));
-
-        if (y != y_exp) ok = false;
+        if (y != y_exp) {
+          Serial.printf("Элемент %d ошибка: A=%d B=%d -> Y=%d (ожидалось %d)\n",
+                        g + 1, a, b, y, y_exp);
+          ok = false;
+        }
       }
     }
 
-    Serial.printf("Итог элемента %d: %s\n",
-                  g + 1, ok ? "OK" : "FAIL");
+    if (!ok) {
+      Serial.printf("НЕИСПРАВЕН элемент %d\n", g + 1);
+      all_ok = false;
+    } else {
+      Serial.printf("Элемент %d OK\n", g + 1);
+    }
   }
 
   Serial.println("\n----");
+
+  return all_ok;
+}
+
+// ---------- Команды ----------
+
+String cmd = "";
+
+void handleCommand(String command) {
+  command.trim();
+  command.toUpperCase();
+
+  bool result;
+
+  if (command == "HC00") {
+    result = test_chip("74HC00 (NAND)", HC00, fNAND);
+  }
+  else if (command == "HC08") {
+    result = test_chip("74HC08 (AND)", HC00, fAND);
+  }
+  else if (command == "HC32") {
+    result = test_chip("74HC32 (OR)", HC00, fOR);
+  }
+  else if (command == "HC02") {
+    result = test_chip("74HC02 (NOR)", HC02, fNOR);
+  }
+  else if (command == "HELP") {
+    Serial.println("\nКоманды: HC00 HC08 HC32 HC02");
+    return;
+  }
+  else {
+    Serial.println("Неизвестная команда");
+    return;
+  }
+
+  // ---------- Индикация ----------
+  if (result) {
+    Serial.println("ВСЁ ИСПРАВНО");
+    blinkLED(2);
+  } else {
+    Serial.println("ОБНАРУЖЕНЫ ОШИБКИ");
+    blinkLED(4);
+  }
 }
 
 // ---------- SETUP ----------
@@ -108,24 +157,31 @@ void test_chip(const char* name, Gate gates[], bool (*logic)(int,int)) {
 void setup() {
   Serial.begin(115200);
 
+  pinMode(LED_PIN, OUTPUT);
+
   for (int i = 1; i <= 13; i++) {
     if (PIN[i] != -1)
       pinMode(PIN[i], INPUT);
   }
-  
-  Serial.println("=== Универсальный тестер DIP-14 (74HCxx) ===");
+
+  Serial.println("=== Тестер 74HCxx ===");
+  Serial.println("Введите команду (HELP)");
 }
 
 // ---------- LOOP ----------
 
 void loop() {
 
-  // Выбирай, что стоит в панельке:
+  while (Serial.available()) {
+    char c = Serial.read();
 
-  test_chip("74HC00 (NAND)", HC00, fNAND);
-  test_chip("74HC08 (AND)",  HC00, fAND);
-  test_chip("74HC32 (OR)",   HC00, fOR);
-  test_chip("74HC02 (NOR)",  HC02, fNOR);
-
-  delay(5000);
+    if (c == '\n' || c == '\r') {
+      if (cmd.length() > 0) {
+        handleCommand(cmd);
+        cmd = "";
+      }
+    } else {
+      cmd += c;
+    }
+  }
 }
