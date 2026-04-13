@@ -1,8 +1,10 @@
 // ==========================
-// Универсальный тестер 74HCxx + 74HC74
+// Универсальный тестер 74HCxx + 74HC74 + 74HC109
 // ==========================
 
 #define LED_PIN 2
+#define RED_PIN 32
+#define GREEN_PIN 33
 
 int PIN[15] = {
   -1,
@@ -63,13 +65,11 @@ Gate HC02[4] = {
 
 // ---------- LED ----------
 
-void blinkLED(int times) {
-  for (int i = 0; i < times; i++) {
-    digitalWrite(LED_PIN, HIGH);
-    delay(200);
-    digitalWrite(LED_PIN, LOW);
-    delay(200);
-  }
+void blinkLED(int pin) {
+    digitalWrite(pin, HIGH);
+    delay(1000);
+    digitalWrite(pin, LOW);
+    delay(1000);
 }
 
 // ---------- Универсальный тест логики ----------
@@ -395,10 +395,10 @@ void handleCommand(String command) {
 
   if (result) {
     Serial.println("OK");
-    blinkLED(2);
+    blinkLED(GREEN_PIN);
   } else {
     Serial.println("FAIL");
-    blinkLED(4);
+    blinkLED(RED_PIN);
   }
 }
 
@@ -407,6 +407,8 @@ void handleCommand(String command) {
 void setup() {
   Serial.begin(115200);
   pinMode(LED_PIN, OUTPUT);
+  pinMode(RED_PIN, OUTPUT);
+  pinMode(GREEN_PIN, OUTPUT);
 
   Serial.println("=== TESTER ===");
   Serial.println("HC00 HC08 HC32 HC02 HC74 HC109");
